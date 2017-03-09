@@ -1,6 +1,6 @@
 {
   "name": "icy-metadata",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Inject icy metadata to stream. Allow to display text info during stream plays (like station name or song title)",
   "main": "icy-metadata.js",
   "scripts": {
