@@ -11,10 +11,7 @@ class IcyMetadata extends Transform {
         this._metaInt = metaInt > 0 ? metaInt : META_INT;
         this._totalBytes = 0;
         this._metaBytes = 0;
-
-        this.processedChunkBytesLeft = 0;
-        this.buffer = new Buffer([]);
-        this.metaIndex = 0;
+        this._processedChunkBytesLeft = 0;
     }
 
     get metaInt() {
@@ -31,10 +28,10 @@ class IcyMetadata extends Transform {
 
     _transform(chunk, encoding, callback) {
 
-        const hasProcessedChunk = !!this.processedChunkBytesLeft,
+        const hasProcessedChunk = !!this._processedChunkBytesLeft,
             chunksCount = Math.max(1, Math.ceil(chunk.length / this.metaInt) - (hasProcessedChunk ? 1 : 0));
 
-        let result = chunk.slice(0, this.processedChunkBytesLeft);
+        let result = chunk.slice(0, this._processedChunkBytesLeft);
 
         for (var i = 0; i < chunksCount; i++) {
 
@@ -44,20 +41,19 @@ class IcyMetadata extends Transform {
                 result = addToBuffer(result, b);
             }
 
-            let start = this.metaInt * i + this.processedChunkBytesLeft,
+            let start = this.metaInt * i + this._processedChunkBytesLeft,
                 end = start + this.metaInt;
 
             if (end > chunk.length) {
                 end = chunk.length;
-                this.processedChunkBytesLeft = this.metaInt - end + start;
+                this._processedChunkBytesLeft = this.metaInt - end + start;
             } else {
-                this.processedChunkBytesLeft = 0;
+                this._processedChunkBytesLeft = 0;
             }
 
             result = addToBuffer(result, chunk.slice(start, end));
 
-            if (!this.processedChunkBytesLeft) {
-                // result = addToBuffer(result, getBufferedMetaData(this));
+            if (!this._processedChunkBytesLeft) {
                 let b = getBufferedMetaData(this);
                 this._metaBytes += b.length;
                 result = addToBuffer(result, b);
@@ -65,14 +61,16 @@ class IcyMetadata extends Transform {
         }
 
         this._totalBytes += result.length;
-        console.log("    ", this.totalBytes, "/", this.metaBytes);
         this.push(result);
-        this.buffer = addToBuffer(this.buffer, result);
         callback();
     }
 
-    addMetaData(value) {
+    setRawMetaData(value) {
         this.metaData = value;
+    }
+
+    setStreamTitle(value) {
+        this.metaData = "StreamTitle='" + value + "';";
     }
 }
 
@@ -81,12 +79,6 @@ function addToBuffer(source, addingValue) {
 }
 
 function getBufferedMetaData(context) {
-
-    // "StreamName"
-    context.metaData = "StreamTitle='x:" + context.metaIndex + "';";
-    // context.metaData = context.metaIndex.toString();
-    console.log(context.metaData);
-    context.metaIndex++;
 
     if (!context.metaData || context.metaData.length == 0) {
         return NO_METADATA;
@@ -99,7 +91,7 @@ function getBufferedMetaData(context) {
     const writtenBytes = result.write(context.metaData, 1) + 1;
     result.fill(0, writtenBytes, result.length)
 
-    // context.metaData = "";
+    context.metaData = "";
     return result;
 }
 
