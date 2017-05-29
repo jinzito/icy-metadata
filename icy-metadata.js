@@ -9,60 +9,50 @@ class IcyMetadata extends Transform {
     constructor(metaInt) {
         super();
         this._metaInt = metaInt > 0 ? metaInt : META_INT;
-        this._totalBytes = 0;
-        this._metaBytes = 0;
-        this._processedChunkBytesLeft = 0;
+        this._bytesBeforeMeta = this.metaInt;
     }
 
     get metaInt() {
         return this._metaInt;
     }
 
-    get totalBytes() {
-        return this._totalBytes;
-    }
-
-    get metaBytes() {
-        return this._metaBytes;
-    }
-
     _transform(chunk, encoding, callback) {
 
-        const hasProcessedChunk = !!this._processedChunkBytesLeft,
-            chunksCount = Math.max(1, Math.ceil(chunk.length / this.metaInt) - (hasProcessedChunk ? 1 : 0));
+        let chunkIndex = 0,
+            chunkLength = chunk.length,
+            result = new Buffer([]);
 
-        let result = chunk.slice(0, this._processedChunkBytesLeft);
+        if (this._bytesBeforeMeta > 0) {
 
-        for (var i = 0; i < chunksCount; i++) {
+            chunkIndex = Math.min(this._bytesBeforeMeta, chunkLength);
 
-            if (i == 0 && hasProcessedChunk) {
-                let b = getBufferedMetaData(this);
-                this._metaBytes += b.length
-                result = addToBuffer(result, b);
-            }
+            result = addToBuffer(result, chunk.slice(0, chunkIndex));
 
-            let start = this.metaInt * i + this._processedChunkBytesLeft,
-                end = start + this.metaInt;
+            this._bytesBeforeMeta -= chunkIndex;
 
-            if (end > chunk.length) {
-                end = chunk.length;
-                this._processedChunkBytesLeft = this.metaInt - end + start;
-            } else {
-                this._processedChunkBytesLeft = 0;
-            }
-
-            result = addToBuffer(result, chunk.slice(start, end));
-
-            if (!this._processedChunkBytesLeft) {
-                let b = getBufferedMetaData(this);
-                this._metaBytes += b.length;
-                result = addToBuffer(result, b);
+            if (this._bytesBeforeMeta === 0) {
+                result = addToBuffer(result, getBufferedMetaData(this));
+                this._bytesBeforeMeta = this.metaInt;
             }
         }
 
-        this._totalBytes += result.length;
-        this.push(result);
-        callback();
+        while (chunkIndex + this.metaInt < chunkLength) {
+
+            result = addToBuffer(result, chunk.slice(chunkIndex, chunkIndex + this.metaInt));
+            chunkIndex += this.metaInt;
+            result = addToBuffer(result, getBufferedMetaData(this));
+            this._bytesBeforeMeta = this.metaInt;
+        }
+
+        result = addToBuffer(result, chunk.slice(chunkIndex, chunkLength));
+        this._bytesBeforeMeta -= (chunkLength - chunkIndex);
+
+        if (this._bytesBeforeMeta === 0) {
+            result = addToBuffer(result, getBufferedMetaData(this));
+            this._bytesBeforeMeta = this.metaInt;
+        }
+
+        callback(null, result);
     }
 
     setRawMetaData(value) {
