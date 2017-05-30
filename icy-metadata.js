@@ -6,14 +6,18 @@ const Transform = require('stream').Transform,
 
 class IcyMetadata extends Transform {
 
-    constructor(metaInt) {
+    constructor(metaInt, bytesBeforeMeta) {
         super();
         this._metaInt = metaInt > 0 ? metaInt : META_INT;
-        this._bytesBeforeMeta = this.metaInt;
+        this._bytesBeforeMeta = !isNaN(bytesBeforeMeta) ? bytesBeforeMeta : this.metaInt;
     }
 
     get metaInt() {
         return this._metaInt;
+    }
+
+    get bytesBeforeMeta() {
+        return this._bytesBeforeMeta;
     }
 
     _transform(chunk, encoding, callback) {
@@ -25,9 +29,7 @@ class IcyMetadata extends Transform {
         if (this._bytesBeforeMeta > 0) {
 
             chunkIndex = Math.min(this._bytesBeforeMeta, chunkLength);
-
             result = addToBuffer(result, chunk.slice(0, chunkIndex));
-
             this._bytesBeforeMeta -= chunkIndex;
 
             if (this._bytesBeforeMeta === 0) {
@@ -40,6 +42,7 @@ class IcyMetadata extends Transform {
 
             result = addToBuffer(result, chunk.slice(chunkIndex, chunkIndex + this.metaInt));
             chunkIndex += this.metaInt;
+
             result = addToBuffer(result, getBufferedMetaData(this));
             this._bytesBeforeMeta = this.metaInt;
         }
