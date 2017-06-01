@@ -9,7 +9,7 @@ class IcyMetadata extends Transform {
     constructor(metaInt, bytesBeforeMeta) {
         super();
         this._metaInt = metaInt > 0 ? metaInt : META_INT;
-        this._bytesBeforeMeta = !isNaN(bytesBeforeMeta) ? bytesBeforeMeta : this.metaInt;
+        this._bytesBeforeMeta = parseInt(bytesBeforeMeta) >= 0 ? parseInt(bytesBeforeMeta) : this.metaInt;
     }
 
     get metaInt() {
